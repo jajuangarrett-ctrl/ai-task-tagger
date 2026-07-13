@@ -97,6 +97,25 @@ export function stripFrontmatter(markdown: string): string {
   return (match ? markdown.slice(match[0].length) : markdown).trim();
 }
 
+export function hasMalformedPropertyBlock(markdown: string): boolean {
+  const lines = markdown.split(/\r?\n/);
+  if (lines[0]?.trim() !== "---") return false;
+
+  const closingIndex = lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---"
+  );
+  if (closingIndex === -1) return true;
+
+  let foundPropertyLine = false;
+  const tail = lines.slice(closingIndex + 1, closingIndex + 31);
+  for (const line of tail) {
+    if (/^[A-Za-z][A-Za-z0-9 _-]*\s*:/.test(line)) foundPropertyLine = true;
+    if (line.trim() === "---" && foundPropertyLine) return true;
+  }
+
+  return false;
+}
+
 export function truncateNote(markdown: string, maxCharacters: number): string {
   if (markdown.length <= maxCharacters) return markdown;
   const marker = "\n\n[... middle of note omitted ...]\n\n";

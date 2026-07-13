@@ -3,6 +3,7 @@ import {
   FALLBACK_TAG,
   canonicalizeAssignment,
   frontmatterTagsToArray,
+  hasMalformedPropertyBlock,
   mergeAssignedTags,
   normalizeVaultTags,
   stripFrontmatter,
@@ -45,6 +46,16 @@ describe("tagging helpers", () => {
   it("removes YAML frontmatter before classification", () => {
     expect(stripFrontmatter("---\ntitle: Test\ntags: []\n---\nBody text"))
       .toBe("Body text");
+  });
+
+  it("detects an unclosed or duplicated property block", () => {
+    expect(hasMalformedPropertyBlock("---\ntitle: Broken\ntags: []\nBody"))
+      .toBe(true);
+    expect(hasMalformedPropertyBlock(
+      "---\ntitle: First\ntags: []\n---\nFolder path\ntags:\n  - career-services\n---\nBody"
+    )).toBe(true);
+    expect(hasMalformedPropertyBlock("---\ntitle: Safe\ntags: []\n---\n# Body\nText"))
+      .toBe(false);
   });
 
   it("keeps the beginning and end when truncating", () => {

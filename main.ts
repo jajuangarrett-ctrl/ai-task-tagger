@@ -14,13 +14,18 @@ import {
 } from "./src/settings";
 import {
   frontmatterTagsToArray,
+  hasMalformedPropertyBlock,
   mergeAssignedTags,
   normalizeVaultTags,
   stripFrontmatter,
   truncateNote,
 } from "./src/tagging";
 import { TAGGER_VIEW_TYPE, TaggerView } from "./src/TaggerView";
-import { detectExplicitProgramTag, getAvailableProgramRules } from "./src/programs";
+import {
+  PROGRAM_TAG_RULES,
+  detectExplicitProgramTag,
+  getAvailableProgramRules,
+} from "./src/programs";
 
 export default class AITaskTaggerPlugin extends Plugin {
   settings: AITaskTaggerSettings = DEFAULT_SETTINGS;
@@ -99,6 +104,13 @@ export default class AITaskTaggerPlugin extends Plugin {
     try {
       const apiKey = await this.getOpenAIKey();
       const markdown = await this.app.vault.cachedRead(file);
+      if (hasMalformedPropertyBlock(markdown)) {
+        new Notice(
+          "AI Task Tagger found a malformed property block and made no changes to this note.",
+          9000
+        );
+        return null;
+      }
       const content = truncateNote(
         stripFrontmatter(markdown),
         this.settings.maxNoteCharacters
@@ -115,7 +127,8 @@ export default class AITaskTaggerPlugin extends Plugin {
         if (!cache) continue;
         for (const tag of getAllTags(cache) ?? []) indexedTags.add(tag);
       }
-      const allowedTags = normalizeVaultTags(indexedTags);
+      const trustedProgramTags = PROGRAM_TAG_RULES.map((rule) => rule.tag);
+      const allowedTags = normalizeVaultTags([...indexedTags, ...trustedProgramTags]);
       const programRules = getAvailableProgramRules(allowedTags);
       const forcedProgramTag = detectExplicitProgramTag(
         file.path,

@@ -38,7 +38,7 @@ export const PROGRAM_TAG_RULES: readonly ProgramTagRule[] = [
   },
   {
     name: "Career Services",
-    tag: "career",
+    tag: "career-services",
     folderNames: ["Career Services"],
     aliases: ["Career Services"],
   },
@@ -160,4 +160,3 @@ export function detectExplicitProgramTag(
 
   return null;
 }
-
