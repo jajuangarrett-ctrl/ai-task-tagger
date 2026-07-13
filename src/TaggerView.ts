@@ -46,7 +46,8 @@ export class TaggerView extends ItemView {
       try {
         const result = await this.plugin.assignActiveNote();
         if (result && this.resultEl) {
-          this.resultEl.setText(`#${result.tag}${result.reason ? ` — ${result.reason}` : ""}`);
+          const tags = result.tags.map((tag) => `#${tag}`).join(" · ");
+          this.resultEl.setText(`${tags}${result.reason ? ` — ${result.reason}` : ""}`);
           this.resultEl.show();
         }
       } finally {
@@ -65,4 +66,3 @@ export class TaggerView extends ItemView {
     this.statusEl.setText(file ? `Active note: ${file.basename}` : "Open a Markdown note to begin.");
   }
 }
-

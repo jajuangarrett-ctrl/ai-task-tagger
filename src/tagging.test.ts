@@ -3,7 +3,7 @@ import {
   FALLBACK_TAG,
   canonicalizeAssignment,
   frontmatterTagsToArray,
-  mergeAssignedTag,
+  mergeAssignedTags,
   normalizeVaultTags,
   stripFrontmatter,
   truncateNote,
@@ -21,13 +21,18 @@ describe("tagging helpers", () => {
   });
 
   it("preserves existing tags while appending the assignment", () => {
-    expect(mergeAssignedTag(["meeting", "BSSP"], "CalWORKs"))
-      .toEqual(["meeting", "BSSP", "CalWORKs"]);
+    expect(mergeAssignedTags(["meeting", "BSSP"], ["CalWORKs", "operations"]))
+      .toEqual(["meeting", "BSSP", "CalWORKs", "operations"]);
   });
 
   it("removes the fallback when a real tag is later assigned", () => {
-    expect(mergeAssignedTag([FALLBACK_TAG, "meeting"], "BSSP"))
+    expect(mergeAssignedTags([FALLBACK_TAG, "meeting"], ["BSSP"]))
       .toEqual(["meeting", "BSSP"]);
+  });
+
+  it("does not keep unassigned beside a real assignment", () => {
+    expect(mergeAssignedTags([], [FALLBACK_TAG, "BSSP"]))
+      .toEqual(["BSSP"]);
   });
 
   it("rejects invented model output", () => {
@@ -51,4 +56,3 @@ describe("tagging helpers", () => {
     expect(result).toContain("middle of note omitted");
   });
 });
-

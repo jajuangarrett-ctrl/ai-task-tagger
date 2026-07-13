@@ -1,7 +1,7 @@
-import { FALLBACK_TAG, canonicalizeAssignment } from "./tagging";
+import { FALLBACK_TAG, resolveAllowedTag } from "./tagging";
 
 export interface TagAssignment {
-  tag: string;
+  tags: string[];
   reason: string;
 }
 
@@ -27,7 +27,8 @@ export function extractResponseText(response: unknown): string | null {
 
 export function parseTagAssignment(
   response: unknown,
-  allowedTags: string[]
+  allowedTags: string[],
+  forcedProgramTag: string | null = null
 ): TagAssignment {
   const text = extractResponseText(response);
   if (!text) throw new Error("OpenAI returned no classification text.");
@@ -44,12 +45,40 @@ export function parseTagAssignment(
   }
 
   const record = parsed as Record<string, unknown>;
-  const proposed = typeof record.tag === "string" ? record.tag : FALLBACK_TAG;
+  const proposed = Array.isArray(record.tags)
+    ? record.tags.filter((tag): tag is string => typeof tag === "string")
+    : typeof record.tag === "string"
+      ? [record.tag]
+      : [];
   const reason = typeof record.reason === "string" ? record.reason.trim() : "";
 
+  const validTags: string[] = [];
+  for (const proposedTag of proposed) {
+    const allowed = resolveAllowedTag(proposedTag, allowedTags);
+    if (!allowed) continue;
+    if (!validTags.some((tag) => tag.toLocaleLowerCase() === allowed.toLocaleLowerCase())) {
+      validTags.push(allowed);
+    }
+  }
+
+  const realTags = validTags.filter(
+    (tag) => tag.toLocaleLowerCase() !== FALLBACK_TAG
+  );
+  const forced = forcedProgramTag
+    ? resolveAllowedTag(forcedProgramTag, allowedTags)
+    : null;
+
+  const tags: string[] = [];
+  if (forced && forced.toLocaleLowerCase() !== FALLBACK_TAG) tags.push(forced);
+  for (const tag of realTags) {
+    if (tags.some((existing) => existing.toLocaleLowerCase() === tag.toLocaleLowerCase())) continue;
+    tags.push(tag);
+    if (tags.length === 2) break;
+  }
+  if (tags.length === 0) tags.push(FALLBACK_TAG);
+
   return {
-    tag: canonicalizeAssignment(proposed, allowedTags),
+    tags,
     reason,
   };
 }
-

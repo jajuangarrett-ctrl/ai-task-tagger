@@ -37,8 +37,15 @@ export function frontmatterTagsToArray(value: unknown): string[] {
   return [];
 }
 
-export function mergeAssignedTag(existingTags: string[], assignedTag: string): string[] {
-  const assigned = normalizeTag(assignedTag) || FALLBACK_TAG;
+export function mergeAssignedTags(existingTags: string[], assignedTags: string[]): string[] {
+  const assignments = assignedTags
+    .map((tag) => normalizeTag(tag) || FALLBACK_TAG)
+    .filter((tag, index, all) =>
+      all.findIndex((candidate) => candidate.toLocaleLowerCase() === tag.toLocaleLowerCase()) === index
+    );
+  const hasRealAssignment = assignments.some(
+    (tag) => tag.toLocaleLowerCase() !== FALLBACK_TAG
+  );
   const result: string[] = [];
   const seen = new Set<string>();
 
@@ -46,29 +53,42 @@ export function mergeAssignedTag(existingTags: string[], assignedTag: string): s
     const tag = normalizeTag(rawTag);
     if (!tag) continue;
     const key = tag.toLocaleLowerCase();
-    if (assigned.toLocaleLowerCase() !== FALLBACK_TAG && key === FALLBACK_TAG) continue;
+    if (hasRealAssignment && key === FALLBACK_TAG) continue;
     if (!seen.has(key)) {
       seen.add(key);
       result.push(tag);
     }
   }
 
-  const assignedKey = assigned.toLocaleLowerCase();
-  if (!seen.has(assignedKey)) result.push(assigned);
+  for (const assigned of assignments) {
+    const assignedKey = assigned.toLocaleLowerCase();
+    if (hasRealAssignment && assignedKey === FALLBACK_TAG) continue;
+    if (!seen.has(assignedKey)) {
+      seen.add(assignedKey);
+      result.push(assigned);
+    }
+  }
+
+  if (assignments.length === 0 && !seen.has(FALLBACK_TAG)) result.push(FALLBACK_TAG);
   return result;
+}
+
+export function resolveAllowedTag(
+  proposedTag: string,
+  allowedTags: string[]
+): string | null {
+  const normalized = normalizeTag(proposedTag);
+  if (normalized.toLocaleLowerCase() === FALLBACK_TAG) return FALLBACK_TAG;
+  return allowedTags.find(
+    (tag) => tag.toLocaleLowerCase() === normalized.toLocaleLowerCase()
+  ) ?? null;
 }
 
 export function canonicalizeAssignment(
   proposedTag: string,
   allowedTags: string[]
 ): string {
-  const normalized = normalizeTag(proposedTag);
-  if (normalized.toLocaleLowerCase() === FALLBACK_TAG) return FALLBACK_TAG;
-
-  const allowed = allowedTags.find(
-    (tag) => tag.toLocaleLowerCase() === normalized.toLocaleLowerCase()
-  );
-  return allowed ?? FALLBACK_TAG;
+  return resolveAllowedTag(proposedTag, allowedTags) ?? FALLBACK_TAG;
 }
 
 export function stripFrontmatter(markdown: string): string {
@@ -85,4 +105,3 @@ export function truncateNote(markdown: string, maxCharacters: number): string {
   const end = available - beginning;
   return `${markdown.slice(0, beginning)}${marker}${markdown.slice(markdown.length - end)}`;
 }
-

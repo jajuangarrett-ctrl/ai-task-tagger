@@ -14,12 +14,13 @@ import {
 } from "./src/settings";
 import {
   frontmatterTagsToArray,
-  mergeAssignedTag,
+  mergeAssignedTags,
   normalizeVaultTags,
   stripFrontmatter,
   truncateNote,
 } from "./src/tagging";
 import { TAGGER_VIEW_TYPE, TaggerView } from "./src/TaggerView";
+import { detectExplicitProgramTag, getAvailableProgramRules } from "./src/programs";
 
 export default class AITaskTaggerPlugin extends Plugin {
   settings: AITaskTaggerSettings = DEFAULT_SETTINGS;
@@ -115,21 +116,31 @@ export default class AITaskTaggerPlugin extends Plugin {
         for (const tag of getAllTags(cache) ?? []) indexedTags.add(tag);
       }
       const allowedTags = normalizeVaultTags(indexedTags);
+      const programRules = getAvailableProgramRules(allowedTags);
+      const forcedProgramTag = detectExplicitProgramTag(
+        file.path,
+        file.basename,
+        content,
+        programRules
+      );
       const assignment = await classifyNote({
         apiKey,
         model: this.settings.model,
         title: file.basename,
         content,
         allowedTags,
+        programRules,
+        forcedProgramTag,
       });
 
       await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
         const existing = frontmatterTagsToArray(frontmatter.tags);
-        frontmatter.tags = mergeAssignedTag(existing, assignment.tag);
+        frontmatter.tags = mergeAssignedTags(existing, assignment.tags);
       });
 
       const reason = assignment.reason ? ` ${assignment.reason}` : "";
-      new Notice(`Assigned #${assignment.tag}.${reason}`, 7000);
+      const assignedLabels = assignment.tags.map((tag) => `#${tag}`).join(" and ");
+      new Notice(`Assigned ${assignedLabels}.${reason}`, 7000);
       return assignment;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
