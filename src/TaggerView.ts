@@ -32,12 +32,12 @@ export class TaggerView extends ItemView {
     container.createEl("h3", { text: "AI Task Tagger" });
     container.createEl("p", {
       cls: "ai-task-tagger-panel__description",
-      text: "Read the active note and add one existing vault tag to its tags property.",
+      text: "Read the active note and add one or two existing vault tags to its tags property.",
     });
     this.statusEl = container.createEl("p", { cls: "ai-task-tagger-panel__status" });
     const button = container.createEl("button", {
       cls: "mod-cta ai-task-tagger-panel__button",
-      text: "Assign tag to active note",
+      text: "Assign tags to active note",
     });
     this.resultEl = container.createDiv({ cls: "ai-task-tagger-panel__result" });
     this.resultEl.hide();

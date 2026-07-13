@@ -81,7 +81,6 @@ export async function classifyNote(input: ClassifyNoteInput): Promise<TagAssignm
                 },
                 minItems: 1,
                 maxItems: 2,
-                uniqueItems: true,
                 description: "One required tag and, when useful, one related tag. Program tag first.",
               },
               reason: {

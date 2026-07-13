@@ -15,10 +15,10 @@ AI Task Tagger is an Obsidian plugin that reads the active Markdown note, asks O
 
 ## Commands and buttons
 
-- Ribbon button: **Assign existing tag with AI**
-- Command: **AI Task Tagger: Assign existing tag to active note with AI**
+- Ribbon button: **Assign existing tags with AI**
+- Command: **AI Task Tagger: Assign existing tags to active note with AI**
 - Command: **AI Task Tagger: Open AI Task Tagger panel**
-- Side-panel view with an **Assign tag to active note** button
+- Side-panel view with an **Assign tags to active note** button
 
 The assignment command can also be placed in Obsidian's mobile toolbar or a Note Toolbar configuration.
 

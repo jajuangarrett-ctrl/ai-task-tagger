@@ -36,13 +36,13 @@ export default class AITaskTaggerPlugin extends Plugin {
 
     this.registerView(TAGGER_VIEW_TYPE, (leaf: WorkspaceLeaf) => new TaggerView(leaf, this));
 
-    this.addRibbonIcon("tags", "Assign existing tag with AI", () => {
+    this.addRibbonIcon("tags", "Assign existing tags with AI", () => {
       void this.assignActiveNote();
     });
 
     this.addCommand({
       id: "assign-existing-tag",
-      name: "Assign existing tag to active note with AI",
+      name: "Assign existing tags to active note with AI",
       icon: "tags",
       callback: () => void this.assignActiveNote(),
     });
