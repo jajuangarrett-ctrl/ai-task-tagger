@@ -1,0 +1,21 @@
+.ai-task-tagger-panel {
+  padding: var(--size-4-4);
+}
+
+.ai-task-tagger-panel__description,
+.ai-task-tagger-panel__status {
+  color: var(--text-muted);
+}
+
+.ai-task-tagger-panel__button {
+  width: 100%;
+  margin-top: var(--size-4-3);
+}
+
+.ai-task-tagger-panel__result {
+  margin-top: var(--size-4-3);
+  padding: var(--size-4-3);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+

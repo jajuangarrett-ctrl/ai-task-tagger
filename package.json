@@ -1,0 +1,28 @@
+{
+  "name": "ai-task-tagger",
+  "version": "0.1.0",
+  "description": "AI-assisted, existing-tag-only classification for Obsidian notes.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "obsidian-plugin",
+    "obsidian",
+    "openai",
+    "tags"
+  ],
+  "author": "Franklin Garrett",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "builtin-modules": "3.3.0",
+    "esbuild": "^0.28.1",
+    "obsidian": "latest",
+    "tslib": "2.6.2",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
