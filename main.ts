@@ -37,6 +37,7 @@ export default class AITaskTaggerPlugin extends Plugin {
     this.addCommand({
       id: "assign-existing-tag",
       name: "Assign existing tag to active note with AI",
+      icon: "tags",
       callback: () => void this.assignActiveNote(),
     });
 
