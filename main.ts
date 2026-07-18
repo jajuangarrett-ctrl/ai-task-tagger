@@ -279,7 +279,7 @@ export default class AITaskTaggerPlugin extends Plugin {
       }
 
       const cache = this.app.metadataCache.getFileCache(file);
-      const existingTags = normalizeVaultTags(getAllTags(cache) ?? []);
+      const existingTags = normalizeVaultTags(cache ? getAllTags(cache) ?? [] : []);
       if (options.skipTaggedNotes && existingTags.length > 0) {
         stats.skippedTagged += 1;
         continue;

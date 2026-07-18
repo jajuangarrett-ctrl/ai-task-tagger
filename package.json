@@ -1,7 +1,7 @@
 {
   "name": "ai-task-tagger",
-  "version": "0.2.0",
-  "description": "AI-assisted, existing-tag-only classification for Obsidian notes.",
+  "version": "0.3.0",
+  "description": "AI-assisted tag classification for active notes and reviewed folder batches in Obsidian.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

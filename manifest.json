@@ -1,9 +1,9 @@
 {
   "id": "ai-task-tagger",
   "name": "AI Task Tagger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.5.0",
-  "description": "Uses OpenAI to assign one or two existing vault tags to the active note's tags property.",
+  "description": "Assigns reviewed AI tag suggestions to active notes or folders using Obsidian properties.",
   "author": "Franklin Garrett",
   "isDesktopOnly": false
 }

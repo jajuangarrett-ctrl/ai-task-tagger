@@ -1,6 +1,6 @@
 # AI Task Tagger
 
-AI Task Tagger is an Obsidian plugin that reads the active Markdown note, asks OpenAI to choose one or two tags from the vault's existing tag index, validates the result locally, and writes the selected values to the note's `tags` property.
+AI Task Tagger is an Obsidian plugin that classifies an active Markdown note or generates a reviewable program-tag preview for a folder of notes. It validates every result locally and writes only approved values to the note's `tags` property.
 
 ## Safety rules
 
@@ -12,15 +12,29 @@ AI Task Tagger is an Obsidian plugin that reads the active Markdown note, asks O
 - The plugin writes only to YAML frontmatter through Obsidian's Properties API.
 - The credential note is never sent for classification.
 - The API key is not committed to this repository. By default, it is read at runtime from the `Open AI` section of `03 Areas/Passwords/API Keys.md`.
+- Folder previews use only the 17 approved program tags. They never add `unassigned` or general-purpose tags.
+- Folder review writes nothing until the user checks the desired notes and presses **Apply approved tags**.
 
 ## Commands and buttons
 
 - Ribbon button: **Assign existing tags with AI**
 - Command: **AI Task Tagger: Assign existing tags to active note with AI**
 - Command: **AI Task Tagger: Open AI Task Tagger panel**
+- Command: **AI Task Tagger: Review approved program tags for active note's folder**
+- Folder menu: right-click or long-press a folder, then choose **Review approved program tags with AI**
 - Side-panel view with an **Assign tags to active note** button
 
 The assignment command can also be placed in Obsidian's mobile toolbar or a Note Toolbar configuration.
+
+## Reviewed folder workflow
+
+1. Right-click or long-press a folder and select **Review approved program tags with AI**.
+2. Choose whether to include subfolders. By default, the plugin includes subfolders and skips notes that already have tags.
+3. Select **Generate preview**. Empty notes, malformed property blocks, and the credential note are skipped. The scan can be canceled without changing any note.
+4. Review every eligible note. Check or uncheck it, choose a different approved program tag, select **No tag — skip**, or open the note for inspection.
+5. Select **Apply approved tags**. Only checked notes with an approved program tag are changed, and existing tags are preserved.
+
+Notes without a clear program match remain unchecked and untagged. Notes placed inside a configured program folder can be matched locally; other eligible notes may require an OpenAI request during preview generation.
 
 ## Program priority
 
