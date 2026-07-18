@@ -19,3 +19,115 @@
   background: var(--background-secondary);
 }
 
+.ai-task-tagger-folder-scope-modal,
+.ai-task-tagger-folder-progress-modal {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.ai-task-tagger-folder-review-modal {
+  width: min(980px, calc(100vw - 24px));
+}
+
+.ai-task-tagger-folder-path,
+.ai-task-tagger-progress-detail,
+.ai-task-tagger-review-note small {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ai-task-tagger-folder-count,
+.ai-task-tagger-review-summary {
+  font-weight: var(--font-semibold);
+}
+
+.ai-task-tagger-folder-progress-modal progress {
+  width: 100%;
+  height: var(--size-4-3);
+}
+
+.ai-task-tagger-modal-actions,
+.ai-task-tagger-review-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--size-4-2);
+  margin-top: var(--size-4-4);
+}
+
+.ai-task-tagger-review-toolbar {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.ai-task-tagger-selected-count {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.ai-task-tagger-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  max-height: min(58vh, 680px);
+  margin-top: var(--size-4-3);
+  padding-right: var(--size-4-1);
+  overflow-y: auto;
+}
+
+.ai-task-tagger-review-row {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(220px, 0.8fr) auto;
+  align-items: center;
+  gap: var(--size-4-3);
+  padding: var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+
+.ai-task-tagger-review-row > input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.ai-task-tagger-review-row > select {
+  width: 100%;
+}
+
+.ai-task-tagger-review-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-1);
+  min-width: 0;
+}
+
+.ai-task-tagger-review-note strong {
+  overflow-wrap: anywhere;
+}
+
+.ai-task-tagger-review-reason {
+  color: var(--text-normal) !important;
+}
+
+.ai-task-tagger-open-note {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .ai-task-tagger-folder-review-modal {
+    width: calc(100vw - 16px);
+  }
+
+  .ai-task-tagger-review-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ai-task-tagger-review-row > select,
+  .ai-task-tagger-open-note {
+    grid-column: 2;
+  }
+
+  .ai-task-tagger-modal-actions {
+    flex-wrap: wrap;
+  }
+}

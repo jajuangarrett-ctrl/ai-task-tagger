@@ -3,10 +3,11 @@ import {
   Notice,
   Plugin,
   TFile,
+  TFolder,
   WorkspaceLeaf,
 } from "obsidian";
 import { extractOpenAIKeyFromSection } from "./src/credentials";
-import { classifyNote, TagAssignment } from "./src/openai";
+import { classifyNote, classifyProgramNote, TagAssignment } from "./src/openai";
 import {
   DEFAULT_SETTINGS,
   AITaskTaggerSettings,
@@ -26,6 +27,20 @@ import {
   detectExplicitProgramTag,
   getAvailableProgramRules,
 } from "./src/programs";
+import {
+  FolderApplyResult,
+  FolderBatchProgressModal,
+  FolderBatchReviewModal,
+  FolderBatchScopeModal,
+  FolderScanOptions,
+  FolderScanStats,
+  FolderTagProposal,
+} from "./src/FolderBatchModals";
+import {
+  getApprovedProgramTags,
+  isApprovedProgramTag,
+  selectApprovedProgramTag,
+} from "./src/folder-batch";
 
 export default class AITaskTaggerPlugin extends Plugin {
   settings: AITaskTaggerSettings = DEFAULT_SETTINGS;
@@ -52,6 +67,33 @@ export default class AITaskTaggerPlugin extends Plugin {
       name: "Open AI Task Tagger panel",
       callback: () => void this.activatePanel(),
     });
+
+    this.addCommand({
+      id: "review-folder-program-tags",
+      name: "Review approved program tags for active note's folder",
+      icon: "folder-search",
+      checkCallback: (checking) => {
+        const folder = this.app.workspace.getActiveFile()?.parent;
+        if (checking) return folder instanceof TFolder;
+        if (folder instanceof TFolder) {
+          this.openFolderBatch(folder);
+          return true;
+        }
+        return false;
+      },
+    });
+
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (!(file instanceof TFolder)) return;
+        menu.addItem((item) =>
+          item
+            .setTitle("Review approved program tags with AI")
+            .setIcon("folder-search")
+            .onClick(() => this.openFolderBatch(file))
+        );
+      })
+    );
 
     this.addSettingTab(new AITaskTaggerSettingTab(this.app, this));
   }
@@ -162,6 +204,199 @@ export default class AITaskTaggerPlugin extends Plugin {
     } finally {
       this.inFlight.delete(file.path);
     }
+  }
+
+  openFolderBatch(folder: TFolder): void {
+    const directCount = this.collectFolderMarkdownFiles(folder, false).length;
+    const recursiveCount = this.collectFolderMarkdownFiles(folder, true).length;
+    new FolderBatchScopeModal(
+      this.app,
+      folder,
+      directCount,
+      recursiveCount,
+      (options) => void this.generateFolderPreview(folder, options)
+    ).open();
+  }
+
+  private collectFolderMarkdownFiles(folder: TFolder, recursive: boolean): TFile[] {
+    const files: TFile[] = [];
+
+    for (const child of folder.children) {
+      if (child instanceof TFile && child.extension === "md") {
+        files.push(child);
+      } else if (recursive && child instanceof TFolder) {
+        files.push(...this.collectFolderMarkdownFiles(child, true));
+      }
+    }
+
+    return files.sort((a, b) =>
+      a.path.localeCompare(b.path, undefined, { sensitivity: "base" })
+    );
+  }
+
+  private async generateFolderPreview(
+    folder: TFolder,
+    options: FolderScanOptions
+  ): Promise<void> {
+    const files = this.collectFolderMarkdownFiles(folder, options.includeSubfolders);
+    if (files.length === 0) {
+      new Notice("This folder contains no Markdown notes to review.");
+      return;
+    }
+
+    let apiKey: string;
+    try {
+      apiKey = await this.getOpenAIKey();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      new Notice(`AI Task Tagger: ${message}`, 9000);
+      return;
+    }
+
+    const progress = new FolderBatchProgressModal(this.app, folder.path, files.length);
+    progress.open();
+
+    const approvedTags = getApprovedProgramTags();
+    const programRules = getAvailableProgramRules(approvedTags);
+    const proposals: FolderTagProposal[] = [];
+    const stats: FolderScanStats = {
+      total: files.length,
+      skippedCredential: 0,
+      skippedMalformed: 0,
+      skippedEmpty: 0,
+      skippedTagged: 0,
+      classificationFailures: 0,
+    };
+
+    for (let index = 0; index < files.length; index += 1) {
+      if (progress.shouldCancel) break;
+      const file = files[index];
+      progress.update(index, file.path);
+
+      if (file.path === this.settings.credentialNotePath) {
+        stats.skippedCredential += 1;
+        continue;
+      }
+
+      const cache = this.app.metadataCache.getFileCache(file);
+      const existingTags = normalizeVaultTags(getAllTags(cache) ?? []);
+      if (options.skipTaggedNotes && existingTags.length > 0) {
+        stats.skippedTagged += 1;
+        continue;
+      }
+
+      try {
+        const markdown = await this.app.vault.cachedRead(file);
+        if (hasMalformedPropertyBlock(markdown)) {
+          stats.skippedMalformed += 1;
+          continue;
+        }
+
+        const content = truncateNote(
+          stripFrontmatter(markdown),
+          this.settings.maxNoteCharacters
+        );
+        if (!content.trim()) {
+          stats.skippedEmpty += 1;
+          continue;
+        }
+
+        const explicitProgramTag = detectExplicitProgramTag(
+          file.path,
+          file.basename,
+          content,
+          programRules
+        );
+
+        let proposedTag: string | null;
+        let reason: string;
+        if (explicitProgramTag) {
+          proposedTag = selectApprovedProgramTag([explicitProgramTag]);
+          reason = "Matched an approved program from the folder, title, or note text.";
+        } else {
+          const assignment = await classifyProgramNote({
+            apiKey,
+            model: this.settings.model,
+            title: file.basename,
+            content,
+            allowedTags: approvedTags,
+            programRules,
+          });
+          proposedTag = selectApprovedProgramTag(assignment.tags);
+          reason = assignment.reason || "No clear approved program match.";
+        }
+
+        proposals.push({
+          file,
+          existingTags,
+          proposedTag,
+          reason,
+          approved: proposedTag !== null,
+        });
+      } catch (error) {
+        stats.classificationFailures += 1;
+        const message = error instanceof Error ? error.message : String(error);
+        proposals.push({
+          file,
+          existingTags,
+          proposedTag: null,
+          reason: `Could not classify: ${message}`,
+          approved: false,
+        });
+      }
+    }
+
+    if (progress.shouldCancel) {
+      progress.finish();
+      new Notice("Folder review canceled. No notes were changed.", 7000);
+      return;
+    }
+
+    progress.finish();
+    new FolderBatchReviewModal(
+      this.app,
+      folder.path,
+      proposals,
+      stats,
+      (approved) => this.applyFolderProposals(approved)
+    ).open();
+  }
+
+  private async applyFolderProposals(
+    proposals: FolderTagProposal[]
+  ): Promise<FolderApplyResult> {
+    const result: FolderApplyResult = { applied: 0, failures: [] };
+
+    for (const proposal of proposals) {
+      const tag = proposal.proposedTag;
+      if (!tag || !isApprovedProgramTag(tag)) {
+        result.failures.push({
+          path: proposal.file.path,
+          message: "The selected tag is not in the approved program list.",
+        });
+        continue;
+      }
+
+      try {
+        const markdown = await this.app.vault.cachedRead(proposal.file);
+        if (hasMalformedPropertyBlock(markdown)) {
+          throw new Error("The note's property block is malformed.");
+        }
+
+        await this.app.fileManager.processFrontMatter(proposal.file, (frontmatter) => {
+          const existing = frontmatterTagsToArray(frontmatter.tags);
+          frontmatter.tags = mergeAssignedTags(existing, [tag]);
+        });
+        result.applied += 1;
+      } catch (error) {
+        result.failures.push({
+          path: proposal.file.path,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return result;
   }
 
   private async getOpenAIKey(): Promise<string> {
