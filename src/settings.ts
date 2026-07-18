@@ -1,5 +1,9 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type AITaskTaggerPlugin from "../main";
+import {
+  CustomTagDefinition,
+  DEFAULT_CUSTOM_TAG_DEFINITIONS,
+} from "./custom-tags";
 
 export interface AITaskTaggerSettings {
   credentialNotePath: string;
@@ -7,6 +11,7 @@ export interface AITaskTaggerSettings {
   openaiApiKey: string;
   model: string;
   maxNoteCharacters: number;
+  customTagDefinitions: CustomTagDefinition[];
 }
 
 export const DEFAULT_SETTINGS: AITaskTaggerSettings = {
@@ -15,6 +20,10 @@ export const DEFAULT_SETTINGS: AITaskTaggerSettings = {
   openaiApiKey: "",
   model: "gpt-5.4-nano",
   maxNoteCharacters: 60000,
+  customTagDefinitions: DEFAULT_CUSTOM_TAG_DEFINITIONS.map((definition) => ({
+    ...definition,
+    folderPaths: [...definition.folderPaths],
+  })),
 };
 
 export class AITaskTaggerSettingTab extends PluginSettingTab {
@@ -101,6 +110,43 @@ export class AITaskTaggerSettingTab extends PluginSettingTab {
             }
           });
       });
+
+    containerEl.createEl("h3", { text: "Approved custom tags" });
+    containerEl.createEl("p", {
+      text: "Tags created manually during folder review are saved here. The AI may propose them later using their guidance or folder mappings, but it cannot invent additional tags.",
+    });
+
+    if (this.plugin.settings.customTagDefinitions.length === 0) {
+      containerEl.createEl("p", {
+        text: "No custom tags have been approved yet.",
+        cls: "setting-item-description",
+      });
+    }
+
+    for (const definition of this.plugin.settings.customTagDefinitions) {
+      const details = [
+        definition.description,
+        definition.folderPaths.length > 0
+          ? `Folders: ${definition.folderPaths.join(", ")}`
+          : "No automatic folder mapping",
+      ].filter(Boolean).join(" · ");
+
+      new Setting(containerEl)
+        .setName(`#${definition.tag}`)
+        .setDesc(details)
+        .addButton((button) =>
+          button
+            .setButtonText("Remove")
+            .setDestructive()
+            .onClick(async () => {
+              this.plugin.settings.customTagDefinitions =
+                this.plugin.settings.customTagDefinitions.filter(
+                  (candidate) => candidate.tag !== definition.tag
+                );
+              await this.plugin.saveSettings();
+              this.display();
+            })
+        );
+    }
   }
 }
-
