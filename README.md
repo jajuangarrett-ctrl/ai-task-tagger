@@ -14,6 +14,7 @@ AI Task Tagger is an Obsidian plugin that classifies an active Markdown note or 
 - The API key is not committed to this repository. By default, it is read at runtime from the `Open AI` section of `03 Areas/Passwords/API Keys.md`.
 - Folder previews use only the 17 approved program tags. They never add `unassigned` or general-purpose tags.
 - Folder review writes nothing until the user checks the desired notes and presses **Apply approved tags**.
+- Folder review always ignores notes that already contain any tag, including `unassigned`; this safeguard cannot be turned off.
 
 ## Commands and buttons
 
@@ -29,7 +30,7 @@ The assignment command can also be placed in Obsidian's mobile toolbar or a Note
 ## Reviewed folder workflow
 
 1. Right-click or long-press a folder and select **Review approved program tags with AI**.
-2. Choose whether to include subfolders. By default, the plugin includes subfolders and skips notes that already have tags.
+2. Choose whether to include subfolders. Notes that already have any tag are automatically ignored and are never sent for classification.
 3. Select **Generate preview**. Empty notes, malformed property blocks, and the credential note are skipped. The scan can be canceled without changing any note.
 4. Review every eligible note. Check or uncheck it, choose a different approved program tag, select **No tag — skip**, or open the note for inspection.
 5. Select **Apply approved tags**. Only checked notes with an approved program tag are changed, and existing tags are preserved.

@@ -3,7 +3,6 @@ import { PROGRAM_TAG_RULES } from "./programs";
 
 export interface FolderScanOptions {
   includeSubfolders: boolean;
-  skipTaggedNotes: boolean;
 }
 
 export interface FolderScanStats {
@@ -35,7 +34,6 @@ export interface FolderApplyResult {
 
 export class FolderBatchScopeModal extends Modal {
   private includeSubfolders = true;
-  private skipTaggedNotes = true;
 
   constructor(
     app: App,
@@ -56,7 +54,7 @@ export class FolderBatchScopeModal extends Modal {
       cls: "ai-task-tagger-folder-path",
     });
     this.contentEl.createEl("p", {
-      text: "The plugin will generate a preview using only approved program tags. No note will change until you approve the results.",
+      text: "The plugin will generate a preview using only approved program tags. Notes that already have any tag are always ignored. No note will change until you approve the results.",
     });
 
     const countEl = this.contentEl.createEl("p", {
@@ -77,15 +75,6 @@ export class FolderBatchScopeModal extends Modal {
         })
       );
 
-    new Setting(this.contentEl)
-      .setName("Skip notes that already have tags")
-      .setDesc("Recommended. Existing tagged notes will not be sent for classification.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.skipTaggedNotes).onChange((value) => {
-          this.skipTaggedNotes = value;
-        })
-      );
-
     const actions = this.contentEl.createDiv({ cls: "ai-task-tagger-modal-actions" });
     const cancelButton = actions.createEl("button", { text: "Cancel" });
     const previewButton = actions.createEl("button", {
@@ -97,7 +86,6 @@ export class FolderBatchScopeModal extends Modal {
     previewButton.addEventListener("click", () => {
       const options = {
         includeSubfolders: this.includeSubfolders,
-        skipTaggedNotes: this.skipTaggedNotes,
       };
       this.close();
       this.onSubmit(options);

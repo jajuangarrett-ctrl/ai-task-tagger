@@ -1,7 +1,7 @@
 {
   "id": "ai-task-tagger",
   "name": "AI Task Tagger",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "minAppVersion": "1.5.0",
   "description": "Assigns reviewed AI tag suggestions to active notes or folders using Obsidian properties.",
   "author": "Franklin Garrett",

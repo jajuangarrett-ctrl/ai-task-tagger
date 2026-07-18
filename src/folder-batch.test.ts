@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getApprovedProgramTags,
   isApprovedProgramTag,
+  normalizeExistingFolderTags,
   selectApprovedProgramTag,
 } from "./folder-batch";
 
@@ -24,5 +25,12 @@ describe("folder batch tag policy", () => {
   it("validates manually changed review selections", () => {
     expect(isApprovedProgramTag("#BSSP")).toBe(true);
     expect(isApprovedProgramTag("productivity")).toBe(false);
+  });
+
+  it("treats every existing tag as a reason to ignore a folder note", () => {
+    expect(normalizeExistingFolderTags(["#unassigned"])).toEqual(["unassigned"]);
+    expect(normalizeExistingFolderTags(["#BSSP", "bssp", "#task"]))
+      .toEqual(["BSSP", "task"]);
+    expect(normalizeExistingFolderTags([])).toEqual([]);
   });
 });
