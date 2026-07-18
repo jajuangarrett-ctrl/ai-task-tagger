@@ -5,7 +5,7 @@ import type { AvailableProgramTagRule } from "./programs";
 
 export type { TagAssignment } from "./openai-response";
 
-interface ClassifyNoteInput {
+interface ClassificationInput {
   apiKey: string;
   model: string;
   title: string;
@@ -15,7 +15,47 @@ interface ClassifyNoteInput {
   forcedProgramTag: string | null;
 }
 
-export async function classifyNote(input: ClassifyNoteInput): Promise<TagAssignment> {
+interface ClassificationPolicy {
+  maxTags: 1 | 2;
+  systemInstructions: string[];
+  tagDescription: string;
+}
+
+export async function classifyNote(input: ClassificationInput): Promise<TagAssignment> {
+  return requestClassification(input, {
+    maxTags: 2,
+    systemInstructions: [
+      "Classify one Obsidian note by selecting one or two tags from the supplied list.",
+      "PROGRAM PRIORITY: If the note or task is for a program in the supplied program map, the first tag must be that program's corresponding tag.",
+      "Always include the program tag even when a second related tag also applies.",
+      "A second tag is optional. Add it only when it is distinct, strongly supported, and materially useful for finding the note later.",
+      "If the application supplies a forced program tag, it must be the first tag.",
+    ],
+    tagDescription: "One required tag and, when useful, one related tag. Program tag first.",
+  });
+}
+
+export async function classifyProgramNote(
+  input: Omit<ClassificationInput, "forcedProgramTag">
+): Promise<TagAssignment> {
+  return requestClassification(
+    { ...input, forcedProgramTag: null },
+    {
+      maxTags: 1,
+      systemInstructions: [
+        "Classify one Obsidian note by selecting exactly one approved program tag from the supplied list, or unassigned when no program is clearly supported.",
+        "Select a program tag only when the note title or content clearly identifies that program.",
+        "Do not select topical, workflow, or general-purpose tags.",
+      ],
+      tagDescription: "One approved program tag, or unassigned when there is no clear program match.",
+    }
+  );
+}
+
+async function requestClassification(
+  input: ClassificationInput,
+  policy: ClassificationPolicy
+): Promise<TagAssignment> {
   const choices = [...input.allowedTags, FALLBACK_TAG];
   const response = await requestUrl({
     url: "https://api.openai.com/v1/responses",
@@ -35,11 +75,7 @@ export async function classifyNote(input: ClassifyNoteInput): Promise<TagAssignm
             {
               type: "input_text",
               text: [
-                "Classify one Obsidian note by selecting one or two tags from the supplied list.",
-                "PROGRAM PRIORITY: If the note or task is for a program in the supplied program map, the first tag must be that program's corresponding tag.",
-                "Always include the program tag even when a second related tag also applies.",
-                "A second tag is optional. Add it only when it is distinct, strongly supported, and materially useful for finding the note later.",
-                "If the application supplies a forced program tag, it must be the first tag.",
+                ...policy.systemInstructions,
                 `If no supplied tag is a clear fit, return only ${FALLBACK_TAG}.`,
                 "Never invent, rewrite, combine, generalize, or hierarchically extend a tag.",
                 "Return every tag exactly as supplied, without a leading #.",
@@ -80,8 +116,8 @@ export async function classifyNote(input: ClassifyNoteInput): Promise<TagAssignm
                   enum: choices,
                 },
                 minItems: 1,
-                maxItems: 2,
-                description: "One required tag and, when useful, one related tag. Program tag first.",
+                maxItems: policy.maxTags,
+                description: policy.tagDescription,
               },
               reason: {
                 type: "string",
