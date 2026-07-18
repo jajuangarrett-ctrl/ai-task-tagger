@@ -7,7 +7,7 @@ import {
   WorkspaceLeaf,
 } from "obsidian";
 import { extractOpenAIKeyFromSection } from "./src/credentials";
-import { classifyNote, classifyProgramNote, TagAssignment } from "./src/openai";
+import { classifyFolderNote, classifyNote, TagAssignment } from "./src/openai";
 import {
   DEFAULT_SETTINGS,
   AITaskTaggerSettings,
@@ -37,11 +37,17 @@ import {
   FolderTagProposal,
 } from "./src/FolderBatchModals";
 import {
-  getApprovedProgramTags,
-  isApprovedProgramTag,
   normalizeExistingFolderTags,
-  selectApprovedProgramTag,
 } from "./src/folder-batch";
+import {
+  CustomTagDefinition,
+  detectFolderMappedTag,
+  getApprovedFolderTags,
+  mergeCustomTagDefinition,
+  resolveApprovedFolderTag,
+  sanitizeCustomTagDefinitions,
+  selectApprovedFolderTag,
+} from "./src/custom-tags";
 
 export default class AITaskTaggerPlugin extends Plugin {
   settings: AITaskTaggerSettings = DEFAULT_SETTINGS;
@@ -104,7 +110,15 @@ export default class AITaskTaggerPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded = await this.loadData() as Partial<AITaskTaggerSettings> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded ?? {});
+    const savedCustomTags = loaded && Object.prototype.hasOwnProperty.call(
+      loaded,
+      "customTagDefinitions"
+    )
+      ? loaded.customTagDefinitions
+      : DEFAULT_SETTINGS.customTagDefinitions;
+    this.settings.customTagDefinitions = sanitizeCustomTagDefinitions(savedCustomTags);
   }
 
   async saveSettings(): Promise<void> {
@@ -257,7 +271,8 @@ export default class AITaskTaggerPlugin extends Plugin {
     const progress = new FolderBatchProgressModal(this.app, folder.path, files.length);
     progress.open();
 
-    const approvedTags = getApprovedProgramTags();
+    const customTagDefinitions = this.settings.customTagDefinitions;
+    const approvedTags = getApprovedFolderTags(customTagDefinitions);
     const programRules = getAvailableProgramRules(approvedTags);
     const proposals: FolderTagProposal[] = [];
     const stats: FolderScanStats = {
@@ -310,23 +325,40 @@ export default class AITaskTaggerPlugin extends Plugin {
           content,
           programRules
         );
+        const mappedCustomTag = detectFolderMappedTag(
+          file.path,
+          customTagDefinitions
+        );
 
         let proposedTag: string | null;
         let reason: string;
         if (explicitProgramTag) {
-          proposedTag = selectApprovedProgramTag([explicitProgramTag]);
+          proposedTag = selectApprovedFolderTag(
+            [explicitProgramTag],
+            customTagDefinitions
+          );
           reason = "Matched an approved program from the folder, title, or note text.";
+        } else if (mappedCustomTag) {
+          proposedTag = resolveApprovedFolderTag(
+            mappedCustomTag,
+            customTagDefinitions
+          );
+          reason = "Matched a custom tag that you mapped to this folder.";
         } else {
-          const assignment = await classifyProgramNote({
+          const assignment = await classifyFolderNote({
             apiKey,
             model: this.settings.model,
             title: file.basename,
             content,
             allowedTags: approvedTags,
             programRules,
+            customTagDefinitions,
           });
-          proposedTag = selectApprovedProgramTag(assignment.tags);
-          reason = assignment.reason || "No clear approved program match.";
+          proposedTag = selectApprovedFolderTag(
+            assignment.tags,
+            customTagDefinitions
+          );
+          reason = assignment.reason || "No clear approved tag match.";
         }
 
         proposals.push({
@@ -361,8 +393,28 @@ export default class AITaskTaggerPlugin extends Plugin {
       folder.path,
       proposals,
       stats,
+      this.settings.customTagDefinitions.map((definition) => ({
+        ...definition,
+        folderPaths: [...definition.folderPaths],
+      })),
+      (definition) => this.saveCustomTagDefinition(definition),
       (approved) => this.applyFolderProposals(approved)
     ).open();
+  }
+
+  private async saveCustomTagDefinition(
+    definition: CustomTagDefinition
+  ): Promise<CustomTagDefinition> {
+    this.settings.customTagDefinitions = mergeCustomTagDefinition(
+      this.settings.customTagDefinitions,
+      definition
+    );
+    await this.saveSettings();
+    const saved = this.settings.customTagDefinitions.find(
+      (candidate) => candidate.tag.toLocaleLowerCase() === definition.tag.toLocaleLowerCase()
+    );
+    if (!saved) throw new Error("The custom tag could not be saved.");
+    return saved;
   }
 
   private async applyFolderProposals(
@@ -372,10 +424,10 @@ export default class AITaskTaggerPlugin extends Plugin {
 
     for (const proposal of proposals) {
       const tag = proposal.proposedTag;
-      if (!tag || !isApprovedProgramTag(tag)) {
+      if (!tag || !resolveApprovedFolderTag(tag, this.settings.customTagDefinitions)) {
         result.failures.push({
           path: proposal.file.path,
-          message: "The selected tag is not in the approved program list.",
+          message: "The selected tag is not in the approved tag list.",
         });
         continue;
       }

@@ -362,6 +362,7 @@ export class FolderBatchReviewModal extends Modal {
           saved
         );
         proposal.proposedTag = saved.tag;
+        proposal.reason = "Manually created and approved during folder review.";
         proposal.approved = true;
         checkbox.checked = true;
         for (const control of this.controls) {
