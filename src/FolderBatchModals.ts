@@ -1,5 +1,12 @@
 import { App, Modal, Setting, TFile, TFolder } from "obsidian";
 import { PROGRAM_TAG_RULES } from "./programs";
+import {
+  CustomTagDefinition,
+  mergeCustomTagDefinition,
+  normalizeManualTagName,
+} from "./custom-tags";
+
+const CREATE_NEW_TAG_VALUE = "__create_new_tag__";
 
 export interface FolderScanOptions {
   includeSubfolders: boolean;
@@ -178,6 +185,10 @@ export class FolderBatchReviewModal extends Modal {
     private readonly folderPath: string,
     private readonly proposals: FolderTagProposal[],
     private readonly stats: FolderScanStats,
+    private customTagDefinitions: CustomTagDefinition[],
+    private readonly onCreateCustomTag: (
+      definition: CustomTagDefinition
+    ) => Promise<CustomTagDefinition>,
     private readonly onApply: (proposals: FolderTagProposal[]) => Promise<FolderApplyResult>
   ) {
     super(app);
@@ -185,14 +196,14 @@ export class FolderBatchReviewModal extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("ai-task-tagger-folder-review-modal");
-    this.setTitle("Approve program tags");
+    this.setTitle("Approve tags");
 
     this.contentEl.createEl("p", {
       text: this.folderPath || "Vault root",
       cls: "ai-task-tagger-folder-path",
     });
     this.contentEl.createEl("p", {
-      text: "Review each proposal. Uncheck a note, choose a different approved program, or select No tag — skip. Nothing has been written yet.",
+      text: "Review each proposal. Choose an approved tag, create a new tag, or select No tag — skip. Nothing has been written to your notes yet.",
     });
 
     const matched = this.proposals.filter((proposal) => proposal.proposedTag).length;
@@ -249,15 +260,8 @@ export class FolderBatchReviewModal extends Modal {
       }
 
       const select = row.createEl("select");
-      select.setAttr("aria-label", `Program tag for ${proposal.file.basename}`);
-      select.createEl("option", { text: "No tag — skip", value: "" });
-      for (const rule of PROGRAM_TAG_RULES) {
-        select.createEl("option", {
-          text: `${rule.name} (#${rule.tag})`,
-          value: rule.tag,
-        });
-      }
-      select.value = proposal.proposedTag ?? "";
+      select.setAttr("aria-label", `Tag for ${proposal.file.basename}`);
+      this.populateTagOptions(select, proposal.proposedTag);
 
       const openButton = row.createEl("button", {
         text: "Open note",
@@ -273,6 +277,11 @@ export class FolderBatchReviewModal extends Modal {
         this.refreshSelectedCount();
       });
       select.addEventListener("change", () => {
+        if (select.value === CREATE_NEW_TAG_VALUE) {
+          select.value = proposal.proposedTag ?? "";
+          this.openCreateTagModal(proposal, checkbox, select);
+          return;
+        }
         proposal.proposedTag = select.value || null;
         proposal.approved = Boolean(select.value);
         checkbox.checked = proposal.approved;
@@ -306,6 +315,62 @@ export class FolderBatchReviewModal extends Modal {
     });
 
     this.refreshSelectedCount();
+  }
+
+  private populateTagOptions(select: HTMLSelectElement, selectedTag: string | null): void {
+    select.empty();
+    select.createEl("option", { text: "No tag — skip", value: "" });
+    for (const rule of PROGRAM_TAG_RULES) {
+      select.createEl("option", {
+        text: `${rule.name} (#${rule.tag})`,
+        value: rule.tag,
+      });
+    }
+    for (const definition of [...this.customTagDefinitions].sort((a, b) =>
+      a.tag.localeCompare(b.tag, undefined, { sensitivity: "base" })
+    )) {
+      select.createEl("option", {
+        text: `Custom: #${definition.tag}`,
+        value: definition.tag,
+      });
+    }
+    select.createEl("option", {
+      text: "＋ Create new tag…",
+      value: CREATE_NEW_TAG_VALUE,
+    });
+    select.value = selectedTag ?? "";
+  }
+
+  private openCreateTagModal(
+    proposal: FolderTagProposal,
+    checkbox: HTMLInputElement,
+    select: HTMLSelectElement
+  ): void {
+    const currentFolder = proposal.file.parent?.path ?? "";
+    const existingTags = [
+      ...PROGRAM_TAG_RULES.map((rule) => rule.tag),
+      ...this.customTagDefinitions.map((definition) => definition.tag),
+    ];
+    new CreateCustomTagModal(
+      this.app,
+      currentFolder,
+      existingTags,
+      async (definition) => {
+        const saved = await this.onCreateCustomTag(definition);
+        this.customTagDefinitions = mergeCustomTagDefinition(
+          this.customTagDefinitions,
+          saved
+        );
+        proposal.proposedTag = saved.tag;
+        proposal.approved = true;
+        checkbox.checked = true;
+        for (const control of this.controls) {
+          this.populateTagOptions(control.select, control.proposal.proposedTag);
+        }
+        select.value = saved.tag;
+        this.refreshSelectedCount();
+      }
+    ).open();
   }
 
   private async applySelected(...otherButtons: HTMLButtonElement[]): Promise<void> {
@@ -346,6 +411,125 @@ export class FolderBatchReviewModal extends Modal {
 
   onClose(): void {
     this.controls = [];
+    this.contentEl.empty();
+  }
+}
+
+class CreateCustomTagModal extends Modal {
+  private rawTag = "";
+  private description = "";
+  private rememberFolder = false;
+  private saveButton: HTMLButtonElement | null = null;
+  private previewEl: HTMLElement | null = null;
+
+  constructor(
+    app: App,
+    private readonly folderPath: string,
+    private readonly existingTags: string[],
+    private readonly onCreate: (definition: CustomTagDefinition) => Promise<void>
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.modalEl.addClass("ai-task-tagger-create-tag-modal");
+    this.setTitle("Create an approved tag");
+    this.contentEl.createEl("p", {
+      text: "This tag will be saved in AI Task Tagger and added to the note only after you approve and apply the review results.",
+    });
+
+    new Setting(this.contentEl)
+      .setName("Tag name")
+      .setDesc("Spaces become hyphens. Example: Self Improvement becomes #self-improvement.")
+      .addText((text) =>
+        text
+          .setPlaceholder("ai-agents")
+          .onChange((value) => {
+            this.rawTag = value;
+            this.refreshValidation();
+          })
+      );
+
+    new Setting(this.contentEl)
+      .setName("When should this tag be used?")
+      .setDesc("Optional guidance helps AI Task Tagger recognize related notes later.")
+      .addTextArea((text) =>
+        text
+          .setPlaceholder("Notes about AI agent design, architectures, tools, and implementation approaches.")
+          .onChange((value) => {
+            this.description = value.trim();
+          })
+      );
+
+    if (this.folderPath) {
+      new Setting(this.contentEl)
+        .setName("Remember for this folder and subfolders")
+        .setDesc(`Automatically propose this tag for untagged notes under ${this.folderPath}.`)
+        .addToggle((toggle) =>
+          toggle.setValue(false).onChange((value) => {
+            this.rememberFolder = value;
+          })
+        );
+    }
+
+    this.previewEl = this.contentEl.createEl("p", {
+      cls: "ai-task-tagger-create-tag-preview",
+    });
+    const actions = this.contentEl.createDiv({ cls: "ai-task-tagger-modal-actions" });
+    const cancelButton = actions.createEl("button", { text: "Cancel" });
+    this.saveButton = actions.createEl("button", {
+      text: "Save approved tag",
+      cls: "mod-cta",
+    });
+    this.saveButton.disabled = true;
+    cancelButton.addEventListener("click", () => this.close());
+    this.saveButton.addEventListener("click", () => void this.save());
+    this.refreshValidation();
+  }
+
+  private refreshValidation(): void {
+    const normalized = normalizeManualTagName(this.rawTag);
+    const alreadyExists = normalized && this.existingTags.some(
+      (tag) => tag.toLocaleLowerCase() === normalized.toLocaleLowerCase()
+    );
+    if (this.previewEl) {
+      if (!this.rawTag.trim()) {
+        this.previewEl.setText("Enter a tag name.");
+      } else if (!normalized) {
+        this.previewEl.setText("Enter a valid tag containing letters.");
+      } else if (alreadyExists) {
+        this.previewEl.setText(`#${normalized} is already approved. Choose it from the list instead.`);
+      } else {
+        this.previewEl.setText(`New tag: #${normalized}`);
+      }
+    }
+    if (this.saveButton) this.saveButton.disabled = !normalized || Boolean(alreadyExists);
+  }
+
+  private async save(): Promise<void> {
+    const tag = normalizeManualTagName(this.rawTag);
+    if (!tag || !this.saveButton) return;
+    this.saveButton.disabled = true;
+    this.saveButton.setText("Saving…");
+    try {
+      await this.onCreate({
+        tag,
+        description: this.description,
+        folderPaths: this.rememberFolder && this.folderPath ? [this.folderPath] : [],
+      });
+      this.close();
+    } catch (error) {
+      if (this.previewEl) {
+        this.previewEl.setText(
+          error instanceof Error ? error.message : "The tag could not be saved."
+        );
+      }
+      this.saveButton.disabled = false;
+      this.saveButton.setText("Save approved tag");
+    }
+  }
+
+  onClose(): void {
     this.contentEl.empty();
   }
 }

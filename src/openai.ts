@@ -2,6 +2,7 @@ import { requestUrl } from "obsidian";
 import { FALLBACK_TAG } from "./tagging";
 import { parseTagAssignment, TagAssignment } from "./openai-response";
 import type { AvailableProgramTagRule } from "./programs";
+import type { CustomTagDefinition } from "./custom-tags";
 
 export type { TagAssignment } from "./openai-response";
 
@@ -13,6 +14,7 @@ interface ClassificationInput {
   allowedTags: string[];
   programRules: AvailableProgramTagRule[];
   forcedProgramTag: string | null;
+  customTagDefinitions?: CustomTagDefinition[];
 }
 
 interface ClassificationPolicy {
@@ -35,7 +37,7 @@ export async function classifyNote(input: ClassificationInput): Promise<TagAssig
   });
 }
 
-export async function classifyProgramNote(
+export async function classifyFolderNote(
   input: Omit<ClassificationInput, "forcedProgramTag">
 ): Promise<TagAssignment> {
   return requestClassification(
@@ -43,11 +45,12 @@ export async function classifyProgramNote(
     {
       maxTags: 1,
       systemInstructions: [
-        "Classify one Obsidian note by selecting exactly one approved program tag from the supplied list, or unassigned when no program is clearly supported.",
-        "Select a program tag only when the note title or content clearly identifies that program.",
-        "Do not select topical, workflow, or general-purpose tags.",
+        "Classify one Obsidian note by selecting exactly one user-approved tag from the supplied list, or unassigned when no tag is clearly supported.",
+        "The list contains fixed program tags and custom tags that the user manually created.",
+        "Use the supplied custom-tag guidance when deciding whether a custom tag applies.",
+        "Select a tag only when the note title or content clearly supports it.",
       ],
-      tagDescription: "One approved program tag, or unassigned when there is no clear program match.",
+      tagDescription: "One user-approved program or custom tag, or unassigned when there is no clear match.",
     }
   );
 }
@@ -94,6 +97,7 @@ async function requestClassification(
                 `NOTE TITLE:\n${input.title}`,
                 `\nALLOWED TAGS:\n${JSON.stringify(input.allowedTags)}`,
                 `\nPROGRAM TAG MAP:\n${JSON.stringify(input.programRules.map((rule) => ({ program: rule.name, tag: rule.tag })))}`,
+                `\nCUSTOM TAG GUIDANCE:\n${JSON.stringify((input.customTagDefinitions ?? []).map((definition) => ({ tag: definition.tag, guidance: definition.description })))}`,
                 `\nFORCED PROGRAM TAG:\n${input.forcedProgramTag ?? "none"}`,
                 `\nNOTE CONTENT:\n<note>\n${input.content}\n</note>`,
               ].join("\n"),
