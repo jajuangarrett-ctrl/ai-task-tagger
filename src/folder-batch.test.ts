@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractFrontmatterFolderTags,
   getApprovedProgramTags,
   isApprovedProgramTag,
   normalizeExistingFolderTags,
@@ -32,5 +33,15 @@ describe("folder batch tag policy", () => {
     expect(normalizeExistingFolderTags(["#BSSP", "bssp", "#task"]))
       .toEqual(["BSSP", "task"]);
     expect(normalizeExistingFolderTags([])).toEqual([]);
+  });
+
+  it("detects existing tags directly from frontmatter when metadata is unavailable", () => {
+    expect(extractFrontmatterFolderTags(
+      "---\ntitle: Example\ntags:\n  - unassigned\n  - self-improvement\n---\nBody"
+    )).toEqual(["unassigned", "self-improvement"]);
+    expect(extractFrontmatterFolderTags(
+      "---\ntags: [task, ai-agents]\n---\nBody"
+    )).toEqual(["task", "ai-agents"]);
+    expect(extractFrontmatterFolderTags("---\ntags: []\n---\nBody")).toEqual([]);
   });
 });

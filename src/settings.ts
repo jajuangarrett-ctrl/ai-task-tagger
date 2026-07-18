@@ -39,7 +39,7 @@ export class AITaskTaggerSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "AI Task Tagger" });
     containerEl.createEl("p", {
-      text: "The plugin chooses from tags already indexed by Obsidian. The reserved fallback is unassigned.",
+      text: "Single-note mode uses existing vault tags. Folder mode uses fixed program tags plus custom tags you manually approve.",
     });
 
     new Setting(containerEl)

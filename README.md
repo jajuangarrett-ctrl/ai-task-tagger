@@ -1,6 +1,6 @@
 # AI Task Tagger
 
-AI Task Tagger is an Obsidian plugin that classifies an active Markdown note or generates a reviewable program-tag preview for a folder of notes. It validates every result locally and writes only approved values to the note's `tags` property.
+AI Task Tagger is an Obsidian plugin that classifies an active Markdown note or generates a reviewable tag preview for a folder of notes. It validates every result locally and writes only approved values to the note's `tags` property.
 
 ## Safety rules
 
@@ -12,30 +12,43 @@ AI Task Tagger is an Obsidian plugin that classifies an active Markdown note or 
 - The plugin writes only to YAML frontmatter through Obsidian's Properties API.
 - The credential note is never sent for classification.
 - The API key is not committed to this repository. By default, it is read at runtime from the `Open AI` section of `03 Areas/Passwords/API Keys.md`.
-- Folder previews use only the 17 approved program tags. They never add `unassigned` or general-purpose tags.
+- Folder previews use the 17 fixed program tags plus custom tags the user manually creates and approves. The model cannot invent additional tags.
 - Folder review writes nothing until the user checks the desired notes and presses **Apply approved tags**.
 - Folder review always ignores notes that already contain any tag, including `unassigned`; this safeguard cannot be turned off.
+- A manually created custom tag is saved for future reviews and becomes an Obsidian tag when it is applied to a note.
 
 ## Commands and buttons
 
 - Ribbon button: **Assign existing tags with AI**
 - Command: **AI Task Tagger: Assign existing tags to active note with AI**
 - Command: **AI Task Tagger: Open AI Task Tagger panel**
-- Command: **AI Task Tagger: Review approved program tags for active note's folder**
-- Folder menu: right-click or long-press a folder, then choose **Review approved program tags with AI**
+- Command: **AI Task Tagger: Review approved tags for active note's folder**
+- Folder menu: right-click or long-press a folder, then choose **Review approved tags with AI**
 - Side-panel view with an **Assign tags to active note** button
 
 The assignment command can also be placed in Obsidian's mobile toolbar or a Note Toolbar configuration.
 
 ## Reviewed folder workflow
 
-1. Right-click or long-press a folder and select **Review approved program tags with AI**.
+1. Right-click or long-press a folder and select **Review approved tags with AI**.
 2. Choose whether to include subfolders. Notes that already have any tag are automatically ignored and are never sent for classification.
 3. Select **Generate preview**. Empty notes, malformed property blocks, and the credential note are skipped. The scan can be canceled without changing any note.
-4. Review every eligible note. Check or uncheck it, choose a different approved program tag, select **No tag — skip**, or open the note for inspection.
-5. Select **Apply approved tags**. Only checked notes with an approved program tag are changed, and existing tags are preserved.
+4. Review every eligible note. Check or uncheck it, choose an approved tag, select **Create new tag…**, select **No tag — skip**, or open the note for inspection.
+5. Select **Apply approved tags**. Only checked notes with an approved tag are changed, and existing tags are preserved.
 
-Notes without a clear program match remain unchecked and untagged. Notes placed inside a configured program folder can be matched locally; other eligible notes may require an OpenAI request during preview generation.
+Notes without a clear match remain unchecked and untagged until the user selects or creates a tag. Program and custom folder mappings are matched locally; other eligible notes may require an OpenAI request during preview generation.
+
+## Manually approved custom tags
+
+Selecting **Create new tag…** opens a form for:
+
+- The tag name; spaces are converted to hyphens.
+- Optional guidance describing when the tag should be proposed.
+- An optional rule to propose the tag automatically for untagged notes in the current folder and its subfolders.
+
+The new tag is saved in plugin settings and immediately appears in every review dropdown. It is written to Obsidian only after the corresponding note is checked and **Apply approved tags** is selected. Approved custom tags can be removed from the plugin's settings without deleting tags already stored on notes.
+
+`self-improvement` is included as the initial custom area tag, with guidance for personal growth and a folder mapping to `03 Areas/Self Improvement`.
 
 ## Program priority
 

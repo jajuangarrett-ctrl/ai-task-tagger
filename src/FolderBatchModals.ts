@@ -61,7 +61,7 @@ export class FolderBatchScopeModal extends Modal {
       cls: "ai-task-tagger-folder-path",
     });
     this.contentEl.createEl("p", {
-      text: "The plugin will generate a preview using only approved program tags. Notes that already have any tag are always ignored. No note will change until you approve the results.",
+      text: "The plugin will generate a preview using fixed program tags and custom tags you manually approved. Notes that already have any tag are always ignored. No note will change until you approve the results.",
     });
 
     const countEl = this.contentEl.createEl("p", {
@@ -250,7 +250,7 @@ export class FolderBatchReviewModal extends Modal {
       noteInfo.createEl("strong", { text: proposal.file.basename });
       noteInfo.createEl("small", { text: proposal.file.path });
       noteInfo.createEl("small", {
-        text: proposal.reason || "No clear approved program match.",
+        text: proposal.reason || "No clear approved tag match.",
         cls: "ai-task-tagger-review-reason",
       });
       if (proposal.existingTags.length > 0) {

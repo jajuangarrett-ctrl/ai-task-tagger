@@ -37,6 +37,7 @@ import {
   FolderTagProposal,
 } from "./src/FolderBatchModals";
 import {
+  extractFrontmatterFolderTags,
   normalizeExistingFolderTags,
 } from "./src/folder-batch";
 import {
@@ -77,7 +78,7 @@ export default class AITaskTaggerPlugin extends Plugin {
 
     this.addCommand({
       id: "review-folder-program-tags",
-      name: "Review approved program tags for active note's folder",
+      name: "Review approved tags for active note's folder",
       icon: "folder-search",
       checkCallback: (checking) => {
         const folder = this.app.workspace.getActiveFile()?.parent;
@@ -95,7 +96,7 @@ export default class AITaskTaggerPlugin extends Plugin {
         if (!(file instanceof TFolder)) return;
         menu.addItem((item) =>
           item
-            .setTitle("Review approved program tags with AI")
+            .setTitle("Review approved tags with AI")
             .setIcon("folder-search")
             .onClick(() => this.openFolderBatch(file))
         );
@@ -294,17 +295,18 @@ export default class AITaskTaggerPlugin extends Plugin {
         continue;
       }
 
-      const cache = this.app.metadataCache.getFileCache(file);
-      const existingTags = normalizeExistingFolderTags(
-        cache ? getAllTags(cache) ?? [] : []
-      );
-      if (existingTags.length > 0) {
-        stats.skippedTagged += 1;
-        continue;
-      }
-
+      let existingTags: string[] = [];
       try {
         const markdown = await this.app.vault.cachedRead(file);
+        const cache = this.app.metadataCache.getFileCache(file);
+        existingTags = normalizeExistingFolderTags([
+          ...(cache ? getAllTags(cache) ?? [] : []),
+          ...extractFrontmatterFolderTags(markdown),
+        ]);
+        if (existingTags.length > 0) {
+          stats.skippedTagged += 1;
+          continue;
+        }
         if (hasMalformedPropertyBlock(markdown)) {
           stats.skippedMalformed += 1;
           continue;
